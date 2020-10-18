@@ -1,5 +1,4 @@
 import base64
-import json
 import os
 from typing import Dict, Optional, Tuple
 
@@ -75,9 +74,13 @@ class HttpClient:
             'Nonce': nonce,
             'Verifier': verifier
         }
-        r = requests.post(cls.URL, data=json.dumps(payload))
-        r.raise_for_status()
+        r = requests.post(cls.URL, json=payload)
         data = r.json()
+
+        error = data.get('Error')
+        if error:
+            raise HTTPError(error)
+        r.raise_for_status()
 
         return data['Id']
 
@@ -91,9 +94,13 @@ class HttpClient:
             'TriggerUnlock': 'false',
             'Id': connection_id
         }
-        r = requests.post(cls.URL, data=json.dumps(payload))
-        r.raise_for_status()
+        r = requests.post(cls.URL, json=payload)
         data = r.json()
+
+        error = data.get('Error')
+        if error:
+            raise HTTPError(error)
+        r.raise_for_status()
 
         return data['Success']
 
@@ -110,9 +117,13 @@ class HttpClient:
             'Url': url,
             'SubmitUrl': url
         }
-        r = requests.post(cls.URL, data=json.dumps(payload))
-        r.raise_for_status()
+        r = requests.post(cls.URL, json=payload)
         data = r.json()
+
+        error = data.get('Error')
+        if error:
+            raise HTTPError(error)
+        r.raise_for_status()
 
         return data['Entries'], data['Nonce']
 
