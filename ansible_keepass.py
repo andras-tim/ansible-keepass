@@ -12,11 +12,68 @@ from ansible.plugins.vars import BaseVarsPlugin
 from ansible.utils.display import Display
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
-from pkcs7 import PKCS7Encoder
+from requests import HTTPError
 
 Credential = Dict[str, str]
 
 display = Display()
+
+
+class PKCS7Encoder(object):
+    def __init__(self, k=16):
+        assert (k <= 256)
+        assert (k > 1)
+        self.__klen = k
+
+    ## @param text The padded text for which the padding is to be removed.
+    # @exception ValueError Raised when the input padding is missing or corrupt.
+    def decode(self, text):
+        dectext = ''
+        if (len(text) % self.__klen) != 0:
+            raise Exception('text not %d align' % self.__klen)
+        lastch = ord(text[-1])
+        if lastch <= self.__klen and lastch != 0:
+            trimlen = lastch
+            textlen = len(text)
+            for i in range(lastch):
+                if ord(text[textlen - i - 1]) != lastch:
+                    trimlen = 0
+                    break
+            if trimlen == 0:
+                dectext = text
+            else:
+                dectext = text[:(textlen - trimlen)]
+        else:
+            dectext = text
+        return dectext
+
+    def get_bytes(self, text):
+        outbytes = []
+        for c in text:
+            outbytes.append(ord(c))
+        return outbytes
+
+    def get_text(self, inbytes):
+        s = ''
+        for i in inbytes:
+            s += chr((i % 256))
+        return s
+
+    def __encode_inner(self, text):
+        '''
+        Pad an input string according to PKCS#7
+        if the real text is bits same ,just expand the text
+        '''
+        enctext = text
+        leftlen = self.__klen - (len(text) % self.__klen)
+        lastch = chr(leftlen)
+        enctext += lastch * leftlen
+
+        return enctext
+
+    ## @param text The text to encode.
+    def encode(self, text):
+        return self.__encode_inner(text)
 
 
 class Encrypter:
@@ -24,7 +81,7 @@ class Encrypter:
 
     def __init__(self, key):
         self.key = key
-        self.encoder = PKCS7Encoder()
+        self.pkcs7_encoder = PKCS7Encoder(16)
 
     def get_verifier(self, iv=None):
         """getting the verifier"""
@@ -34,16 +91,18 @@ class Encrypter:
 
         base64_private_key = base64.b64encode(self.key).decode()
         base64_iv = base64.b64encode(iv).decode()
-        padded_iv = self.encoder.encode(base64_iv)
+        padded_iv = self.pkcs7_encoder.encode(base64_iv)
         verifier = base64.b64encode(aes.encrypt(padded_iv.encode())).decode()
         return base64_private_key, base64_iv, verifier
 
-    def encrypt(self, plain, iv=None):
+    def encrypt(self, plain, iv: Optional[bytes] = None):
         """encryption"""
+        if iv is not None:
+            print()
         if iv is None:
             iv = get_random_bytes(16)
         aes = AES.new(self.key, AES.MODE_CBC, iv)
-        padded_plain = self.encoder.encode(plain)
+        padded_plain = self.pkcs7_encoder.encode(plain)
 
         return base64.b64encode(aes.encrypt(padded_plain.encode())).decode()
 
@@ -54,7 +113,7 @@ class Encrypter:
         aes = AES.new(self.key, AES.MODE_CBC, iv)
         decrypted = aes.decrypt(base64.b64decode(encrypted))
 
-        return self.encoder.decode(decrypted.decode())
+        return self.pkcs7_encoder.decode(decrypted.decode())
 
     @classmethod
     def generate_key(cls):
