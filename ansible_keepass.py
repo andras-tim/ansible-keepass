@@ -1,25 +1,22 @@
 import os
 
-import psutil
-
 import __main__
-import requests
 import keyring
-from ansible.plugins.vars import BaseVarsPlugin
-from ansible.executor.task_executor import TaskExecutor as _TaskExecutor
+import psutil
+import requests
 from ansible.executor import task_executor
 from ansible.executor.process import worker
+from ansible.executor.task_executor import TaskExecutor as _TaskExecutor
+from ansible.plugins.vars import BaseVarsPlugin
 from ansible.utils.display import Display
-from keepasshttplib import keepasshttplib, encrypter
-from keepassxc_browser import Identity, Connection
+from keepasshttplib import encrypter, keepasshttplib
+from keepassxc_browser import Connection, Identity
 from keepassxc_browser.protocol import ProtocolError
-
 
 KEEPASSXC_CLIENT_ID = 'python-keepassxc-browser'
 KEEPASSXC_PROCESS_NAMES = set(('keepassxc', 'keepassxc.exe',
                                'keepassxc-proxy'))
 KEYRING_KEY = 'assoc'
-
 
 display = Display()
 
@@ -191,7 +188,7 @@ def get_or_create_conn(cls):
 
 class TaskExecutor(_TaskExecutor):
     def __init__(self, host, task, job_vars, play_context, *args,
-                    **kwargs):
+                 **kwargs):
         become = task.become or play_context.become
         if become and not job_vars.get('ansible_become_pass'):
             password = NONE
@@ -212,7 +209,7 @@ class TaskExecutor(_TaskExecutor):
             elif password not in [None, NONE]:
                 job_vars['ansible_become_pass'] = password
         super(TaskExecutor, self).__init__(host, task, job_vars,
-            play_context, *args, **kwargs)
+                                           play_context, *args, **kwargs)
 
 
 setattr(task_executor, 'TaskExecutor', TaskExecutor)
@@ -220,7 +217,6 @@ setattr(worker, 'TaskExecutor', TaskExecutor)
 
 
 class VarsModule(BaseVarsPlugin):
-
     """
     Loads variables for groups and/or hosts
     """
