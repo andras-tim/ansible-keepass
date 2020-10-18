@@ -36,7 +36,7 @@ class KeepassXCError(AnsibleKeepassError):
             'KeepassXC Browser.')
 
 
-class KeepassBase(object):
+class KeepassBase:
     def __init__(self):
         self.cached_passwords = {}
 
