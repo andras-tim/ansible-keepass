@@ -1,8 +1,6 @@
 import os
 
 import __main__
-import keyring
-import psutil
 import requests
 from ansible.executor import task_executor
 from ansible.executor.process import worker
@@ -10,13 +8,6 @@ from ansible.executor.task_executor import TaskExecutor as _TaskExecutor
 from ansible.plugins.vars import BaseVarsPlugin
 from ansible.utils.display import Display
 from keepasshttplib import encrypter, keepasshttplib
-from keepassxc_browser import Connection, Identity
-from keepassxc_browser.protocol import ProtocolError
-
-KEEPASSXC_CLIENT_ID = 'python-keepassxc-browser'
-KEEPASSXC_PROCESS_NAMES = set(('keepassxc', 'keepassxc.exe',
-                               'keepassxc-proxy'))
-KEYRING_KEY = 'assoc'
 
 display = Display()
 
@@ -97,85 +88,13 @@ class KeepassHTTP(KeepassBase):
             raise KeepassHTTPError('Connection Error: {}'.format(e))
 
 
-class KeepassXC(KeepassBase):
-    _connection = None
-
-    def __init__(self):
-        super(KeepassXC, self).__init__()
-        try:
-            self.identity = self.get_identity()
-        except Exception as e:
-            raise KeepassConnectionError(
-                'The identity could not be obtained from '
-                'KeepassXC: {}'.format(e)
-            )
-
-    def get_identity(self):
-        data = keyring.get_password(KEEPASSXC_CLIENT_ID, KEYRING_KEY)
-        if data:
-            identity = Identity.unserialize(KEEPASSXC_CLIENT_ID, data)
-        else:
-            identity = Identity(KEEPASSXC_CLIENT_ID)
-        return identity
-
-    def get_connection(self, identity):
-        c = Connection()
-        c.connect()
-        c.change_public_keys(identity)
-        c.get_database_hash(identity)
-
-        if not c.test_associate(identity):
-            c.associate(identity)
-            assert c.test_associate(identity), "Keepass Association failed"
-            data = identity.serialize()
-            keyring.set_password(KEEPASSXC_CLIENT_ID, KEYRING_KEY, data)
-            del data
-        return c
-
-    @property
-    def connection(self):
-        if self._connection is None:
-            try:
-                self._connection = self.get_connection(self.identity)
-            except ProtocolError as e:
-                raise AnsibleKeepassError(
-                    'ProtocolError on connection: {}'.format(e)
-                )
-            except Exception as e:
-                raise AnsibleKeepassError(
-                    'Error on connection: {}'.format(e)
-                )
-        return self._connection
-
-    def get_password(self, host_name):
-        try:
-            logins = self.connection.get_logins(
-                self.identity,
-                url='ssh:{}'.format(host_name)
-            )
-        except ProtocolError:
-            return
-        except Exception as e:
-            raise KeepassXCError(
-                'Error obtaining host name {}: {}'.format(host_name, e)
-            )
-        return next(iter(logins), {}).get('password')
-
-
 def get_host_names(host):
     return [host.name] + [group.name for group in host.groups]
 
 
 def get_keepass_class():
     keepass_class = os.environ.get('KEEPASS_CLASS')
-    if not keepass_class:
-        for process in psutil.process_iter():
-            process_name = process.name().lower() or ''
-            if process_name in KEEPASSXC_PROCESS_NAMES:
-                keepass_class = 'KeepassXC'
-                break
     return {
-        'KeepassXC': KeepassXC,
         'KeepassHTTP': KeepassHTTP,
     }.get(keepass_class, KeepassHTTP)
 
