@@ -12,10 +12,6 @@ from keepasshttplib import encrypter, keepasshttplib
 display = Display()
 
 
-class NONE:
-    pass
-
-
 class AnsibleKeepassError(Exception):
     body = 'Error in the Ansible Keepass plugin.'
 
@@ -50,8 +46,8 @@ class KeepassBase(object):
             return self._get_cached_password(host_name)
 
     def _get_cached_password(self, host_name):
-        password = self.cached_passwords.get(host_name, NONE)
-        if password is NONE:
+        password = self.cached_passwords.get(host_name, None)
+        if password is None:
             password = self.get_password(host_name)
             self.cached_passwords[host_name] = password
         return password
@@ -110,7 +106,7 @@ class TaskExecutor(_TaskExecutor):
                  **kwargs):
         become = task.become or play_context.become
         if become and not job_vars.get('ansible_become_pass'):
-            password = NONE
+            password = None
             cls = get_keepass_class()
             try:
                 kp = get_or_create_conn(cls)
@@ -125,7 +121,7 @@ class TaskExecutor(_TaskExecutor):
                     'Maybe the password is not in the database or does '
                     'not have the url.'
                 )
-            elif password not in [None, NONE]:
+            elif password not in [None, None]:
                 job_vars['ansible_become_pass'] = password
         super(TaskExecutor, self).__init__(host, task, job_vars,
                                            play_context, *args, **kwargs)
