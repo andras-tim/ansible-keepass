@@ -306,7 +306,7 @@ class KeepassHTTP(KeepassBase):
 
     def get_credential(self, host_name: str) -> Tuple[str, str]:
         try:
-            auth = self.k.get_credentials('ansible://{}'.format(host_name))
+            auth = self.k.get_credentials('https://{}'.format(host_name))
         except Exception as e:
             raise KeepassHTTPError(
                 'Error obtaining host name {}: {}'.format(host_name, e)
